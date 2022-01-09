@@ -1,0 +1,32 @@
+{
+    "name": "zozlak/argparse",
+    "type": "library",
+    "description": "A humble PHP clone of Python's argparse library",
+    "keywords": [],
+    "homepage": "https://github.com/zozlak/argparse",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Mateusz Żółtak",
+            "email": "zozlak@zozlak.org",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=8.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "zozlak\\argparse\\": "src/zozlak/argparse"
+        }
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5",
+        "phpstan/phpstan": "^1.3"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "zozlak\\argparse\\": "tests"
+        }
+    }
+}
