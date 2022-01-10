@@ -26,6 +26,8 @@
 
 namespace zozlak\argparse;
 
+use SplObjectStorage;
+
 /**
  * Description of ArgumentParser
  *
@@ -62,23 +64,43 @@ class ArgumentParser {
                                 private string $description = '',
                                 private string $epilog = '',
                                 private bool $exitOnError = true) {
-        $this->prog        = $prog ?? $argv[0] ?? 'SCRIPT';
-        $this->description = !empty($description) ? $description . "\n" : '';
-        $this->epilog      = !empty($epilog) ? $epilog . "\n" : '';
-        $this->addArgument(['--help', '-h'], action: self::ACTION_HELP);
+        $this->prog   = $prog ?? $argv[0] ?? 'SCRIPT';
+        $this->epilog = !empty($epilog) ? "\n$epilog\n" : '';
+        $this->addArgument(['-h', '--help'], action: self::ACTION_HELP, help: "show this help message and exit");
     }
 
     public function __toString(): string {
-        $help = "usage: $this->prog\n\n$this->description";
+        $help = "usage: ";
+
+        if (!empty($this->description)) {
+            $help .= $this->description;
+        } else {
+            $help      .= $this->prog;
+            $processed = new SplObjectStorage();
+            foreach ($this->args as $i) {
+                if (!$processed->contains($i)) {
+                    $help .= $i->toString(true);
+                    $processed->attach($i);
+                }
+            }
+            foreach ($this->posArgs as $i) {
+                $help .= $i->toString(true);
+            }
+        }
+        $help .= "\n$this->epilog";
+
         $help .= count($this->posArgs) > 0 ? "\npositional arguments:\n" : "";
         foreach ($this->posArgs as $i) {
             $help .= "$i\n";
         }
-        $help .= count($this->args) > 0 ? "\noptional arguments:\n" : "";
+        $help      .= count($this->args) > 0 ? "\noptional arguments:\n" : "";
+        $processed = new SplObjectStorage();
         foreach ($this->args as $i) {
-            $help .= "$i\n";
+            if (!$processed->contains($i)) {
+                $help .= "$i\n";
+                $processed->attach($i);
+            }
         }
-        $help .= "\n$this->epilog";
         return $help;
     }
 
@@ -100,9 +122,12 @@ class ArgumentParser {
         }
         $argTypes = array_map(fn($x) => Argument::getType($x), $names);
         if (count(array_unique($argTypes)) > 1) {
-            throw new ArgparseException("Argument must be either positional or optional");
+            throw new ArgparseException("Argument $names[0]] must be either positional or optional");
         }
         $argType = $argTypes[0];
+        if (count($names) > 1 && $argType === Argument::ARGTYPE_POSITIONAL) {
+            throw new ArgparseException("Positional argument $names[0]] can have only one name");
+        }
 
         // sanitize
         if (empty($dest) && $argType === Argument::ARGTYPE_POSITIONAL) {
@@ -123,7 +148,7 @@ class ArgumentParser {
         }
 
         // add mappings
-        $arg = new Argument($action, $nargs, $const, $default, $type, $choices, $required, $help, $metavar, $dest);
+        $arg = new Argument($action, $nargs, $const, $default, $type, $choices, $required, $help, $metavar, $dest, implode(', ', $names), $argType === Argument::ARGTYPE_POSITIONAL);
         foreach ($names as $n => $name) {
             if (empty($name)) {
                 throw new ArgparseException("Argument must have a name");
@@ -148,59 +173,67 @@ class ArgumentParser {
         }
 
         try {
-            $pos = 0;
-            for ($i = 0; $i < count($args); $i++) {
-                $arg = $args[$i];
-                if (Argument::getType($arg) === Argument::ARGTYPE_OPTIONAL) {
-                    if (str_starts_with($arg, '--')) {
-                        if (!isset($this->args[$arg])) {
-                            throw new ArgparseException("Unknown argument $arg");
-                        }
-                        $i = $this->args[$arg]->addValues($args, $i, $arg, $arg);
-                    } else {
-                        for ($j = 1; $j < mb_strlen($arg); $j++) {
-                            $flag = "-" . mb_substr($arg, $j, 1);
-                            if (!isset($this->args[$flag])) {
-                                throw new ArgparseException("Unknown argument $flag");
-                            }
-                            $i = $this->args[$flag]->addValues($args, $i, $flag, $arg);
-                        }
-                    }
-                } else {
-                    if (!isset($this->posArgs[$pos])) {
-                        throw new ArgparseException("Unrecognized argument $arg");
-                    }
-                    $i = $this->posArgs[$pos]->addValues($args, $i);
-                    $pos++;
+            $this->setArgumentValues($args);
+
+            $processedArgs = new SplObjectStorage();
+            foreach ($this->posArgs as $name => $arg) {
+                if ($processedArgs->contains($arg)) {
+                    continue;
+                }
+                $processedArgs->attach($arg);
+                try {
+                    $arg->setValue($namespace);
+                } catch (SuppressException) {
+                    
                 }
             }
+            foreach ($this->args as $name => $arg) {
+                try {
+                    $arg->setValue($namespace, $name);
+                } catch (SuppressException) {
+                    
+                }
+            }
+            return $namespace;
         } catch (ArgparseException $e) {
             if (!$this->exitOnError) {
                 throw $e;
             }
             echo $this;
+            if ($e instanceof HelpException) {
+                exit(0);
+            }
             echo $e->getMessage() . "\n";
             exit(1);
         }
-        $processedArgs = new \SplObjectStorage();
-        foreach ($this->posArgs as $name => $arg) {
-            if ($processedArgs->contains($arg)) {
-                continue;
-            }
-            $processedArgs->attach($arg);
-            try {
-                $arg->setValue($namespace);
-            } catch (SuppressException) {
-                
+    }
+
+    private function setArgumentValues(array $args): void {
+        $pos = 0;
+        for ($i = 0; $i < count($args); $i++) {
+            $arg = $args[$i];
+            if (Argument::getType($arg) === Argument::ARGTYPE_OPTIONAL) {
+                if (str_starts_with($arg, '--')) {
+                    if (!isset($this->args[$arg])) {
+                        throw new ArgparseException("Unknown argument $arg");
+                    }
+                    $i = $this->args[$arg]->addValues($args, $i, $arg, $arg);
+                } else {
+                    for ($j = 1; $j < mb_strlen($arg); $j++) {
+                        $flag = "-" . mb_substr($arg, $j, 1);
+                        if (!isset($this->args[$flag])) {
+                            throw new ArgparseException("Unknown argument $flag");
+                        }
+                        $i = $this->args[$flag]->addValues($args, $i, $flag, $arg);
+                    }
+                }
+            } else {
+                if (!isset($this->posArgs[$pos])) {
+                    throw new ArgparseException("Unrecognized argument $arg");
+                }
+                $i = $this->posArgs[$pos]->addValues($args, $i);
+                $pos++;
             }
         }
-        foreach ($this->args as $name => $arg) {
-            try {
-                $arg->setValue($namespace, $name);
-            } catch (SuppressException) {
-                
-            }
-        }
-        return $namespace;
     }
 }

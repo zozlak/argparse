@@ -56,18 +56,15 @@ class Argument {
     private int $nargsMax;
     private bool $simplify;
     private bool $suppress;
-    private int $mentioned = 0;
+    private int $mentioned            = 0;
 
-    public function __construct(private string $action = ArgumentParser::ACTION_STORE,
-                                private string | int $nargs = ArgumentParser::NARGS_SINGLE,
-                                private mixed $const = null,
-                                private $default = null,
-                                private mixed $type = null,
-                                private array $choices = [],
-                                private bool $required = false,
-                                private string $help = '',
-                                private string $metavar = '',
-                                private string $dest = '') {
+    public function __construct(private string $action,
+                                private string | int $nargs,
+                                private mixed $const, private $default,
+                                private mixed $type, private array $choices,
+                                private bool $required, private string $help,
+                                private string $metavar, private string $dest,
+                                private string $names, private bool $positional) {
         $this->nargsMin = match ($nargs) {
             ArgumentParser::NARGS_NONE => 0,
             ArgumentParser::NARGS_SINGLE => (int) $required,
@@ -91,7 +88,7 @@ class Argument {
         $metavarDefault = mb_strtoupper($this->dest);
         $this->dest     = str_replace('-', '_', $this->dest);
         if (count($this->choices) > 0) {
-            $metavarDefault = "{" . implode(', ', $this->choices) . "}";
+            $metavarDefault = "{" . implode(',', $this->choices) . "}";
         }
         $this->metavar = empty($this->metavar) ? $metavarDefault : $this->metavar;
 
@@ -117,18 +114,41 @@ class Argument {
     }
 
     public function __toString(): string {
-        $help = '  ';
-        $help .= $this->dest;
-        $help .= match ($this->nargs) {
-            ArgumentParser::NARGS_OPT => " $this->metavar",
-            ArgumentParser::NARGS_SINGLE => " $this->metavar",
-            ArgumentParser::NARGS_REQ => " $this->metavar [$this->metavar ...]",
-            ArgumentParser::NARGS_STAR => " [$this->metavar [$this->metavar ...]]",
-            default => str_repeat(" $this->metavar", $this->nargs),
-        };
-        $help .= " " . $this->help;
+        return $this->toString(false);
+    }
+
+    public function toString(bool $short = false): string {
+        $help = '';
+
+        if ($short) {
+            $help .= ($this->required ? " " : " [") . preg_replace('/,.*$/', '', $this->names) . " ";
+        } else {
+            $help .= "  $this->names ";
+        }
+
+        if (!$this->positional && !in_array($this->action, self::$flagActions) && $this->action !== ArgumentParser::ACTION_HELP) {
+            $help .= $this->metavarToString();
+        }
+        if ($short) {
+            $help = rtrim($help);
+            $help .= $this->required ? "" : "]";
+        } else {
+            $len  = mb_strlen($help);
+            $help .= $len <= 24 ? str_repeat(" ", 24 - $len) : "\n                        ";
+            $help .= $this->help;
+        }
 
         return $help;
+    }
+
+    private function metavarToString(): string {
+        return match ($this->nargs) {
+            ArgumentParser::NARGS_OPT => $this->metavar,
+            ArgumentParser::NARGS_SINGLE => $this->metavar,
+            ArgumentParser::NARGS_REQ => "$this->metavar [$this->metavar ...]",
+            ArgumentParser::NARGS_STAR => "[$this->metavar [$this->metavar ...]]",
+            default => str_repeat($this->metavar, $this->nargs),
+        };
     }
 
     public function addValues(array $argv, int $pos, ?string $argName = null): int {
@@ -169,7 +189,7 @@ class Argument {
         $dest = $this->dest;
         switch ($this->action) {
             case ArgumentParser::ACTION_STORE:
-                $fallback = $this->mentioned ? $this->const ?? $this->default : $this->default;
+                $fallback    = $this->mentioned ? $this->const ?? $this->default : $this->default;
                 $data->$dest = $this->values[count($this->values) - 1] ?? ($data->$dest ?? $fallback);
                 break;
             case ArgumentParser::ACTION_STORE_TRUE:
@@ -200,7 +220,7 @@ class Argument {
     }
 
     public function reset(): void {
-        $this->values = [];
+        $this->values    = [];
         $this->mentioned = 0;
     }
 
