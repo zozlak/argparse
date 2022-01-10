@@ -11,7 +11,7 @@ namespace zozlak\argparse;
 use zozlak\argparse\ArgumentParser as AP;
 
 /**
- * Description of LoggerTest
+ * Tests based on code examples on https://docs.python.org/3/library/argparse.html
  *
  * @author zozlak
  */
@@ -91,13 +91,13 @@ class ArgumentParserTest extends \PHPUnit\Framework\TestCase {
     public function testNargsOptional(): void {
         $this->parser->addArgument('--foo', nargs: AP::NARGS_OPT, const: 'c', default: 'd');
         $this->parser->addArgument('bar', nargs: AP::NARGS_OPT, default: 'd');
-        
+
         $args = $this->parser->parseArgs(['XX', '--foo', 'YY']);
         $this->assertEquals((object) ['bar' => 'XX', 'foo' => 'YY'], $args);
-        
+
         $args = $this->parser->parseArgs(['XX', '--foo']);
         $this->assertEquals((object) ['bar' => 'XX', 'foo' => 'c'], $args);
-        
+
         $args = $this->parser->parseArgs([]);
         $this->assertEquals((object) ['bar' => 'd', 'foo' => 'd'], $args);
     }
@@ -114,10 +114,10 @@ class ArgumentParserTest extends \PHPUnit\Framework\TestCase {
 
     public function testNargsRequired(): void {
         $this->parser->addArgument('foo', nargs: AP::NARGS_REQ);
-        
+
         $args = $this->parser->parseArgs(['a', 'b']);
         $this->assertEquals((object) ['foo' => ['a', 'b']], $args);
-        
+
         try {
             $args = $this->parser->parseArgs([]);
             $this->assertTrue(false);
@@ -216,77 +216,87 @@ class ArgumentParserTest extends \PHPUnit\Framework\TestCase {
         }
     }
 
-    public function testHelpString(): void {
-        $this->assertTrue(true);
-//$this->parser->addArgument('--foo', action='store_true', help='foo the bars before frobbling');
-//$this->parser->addArgument('bar', nargs='+', help='one of the bars to be frobbled');
-//$args = $this->parser->parseArgs(['-h'])
-//usage: frobble [-h] [--foo] bar [bar ...]
-//
-//positional arguments:
-// bar     one of the bars to be frobbled
-//
-//options:
-// -h, --help  show this help message and exit
-// --foo   foo the bars before frobbling
-//        //
-//$this->parser = argparse.ArgumentParser(prog='frobble');
-//$this->parser->addArgument('bar', nargs='?', type=int, default=42, help='the bar to %(prog)s (default: %(default)s)');
-//$this->parser->print_help();
-//usage: frobble [-h] [bar]
-//
-//positional arguments:
-// bar     the bar to frobble (default: 42)
-//
-//options:
-// -h, --help  show this help message and exit
-//        //
-//$this->parser = argparse.ArgumentParser(prog='frobble');
-//$this->parser->addArgument('--foo', help=argparse.SUPPRESS);
-//$this->parser->print_help();
-//usage: frobble [-h]
-//
-//options:
-//  -h, --help  show this help message and exit
-//        //
-//$this->parser->addArgument('--foo');
-//$this->parser->addArgument('bar');
-//$args = $this->parser->parseArgs('X --foo Y'.split());
-//Namespace(bar='X', foo='Y')
-//$this->parser->print_help();
-//usage:  [-h] [--foo FOO] bar
-//
-//positional arguments:
-// bar
-//
-//options:
-// -h, --help  show this help message and exit
-// --foo FOO
-//        //
-//$this->parser->addArgument('--foo', metavar='YYY');
-//$this->parser->addArgument('bar', metavar='XXX');
-//$args = $this->parser->parseArgs('X --foo Y'.split());
-//Namespace(bar='X', foo='Y')
-//$this->parser->print_help()
-//usage:  [-h] [--foo YYY] XXX
-//
-//positional arguments:
-// XXX
-//
-//options:
-// -h, --help  show this help message and exit
-// --foo YYY
-//        //
-//$this->parser = argparse.ArgumentParser(prog='PROG');
-//$this->parser->addArgument('-x', nargs=2);
-//$this->parser->addArgument('--foo', nargs=2, metavar=('bar', 'baz'));
-//$this->parser->print_help();
-//usage: PROG [-h] [-x X X] [--foo bar baz]
-//
-//options:
-// -h, --help     show this help message and exit
-// -x X X
-// --foo bar baz
+    public function testHelpString1(): void {
+        $parser   = new ArgumentParser('frobble');
+        $parser->addArgument('--foo', action: 'store_true', help: 'foo the bars before frobbling');
+        $parser->addArgument('bar', nargs: '+', help: 'one of the bars to be frobbled');
+        $expected = <<<S
+usage: frobble [-h] [--foo] bar [bar ...]
+
+positional arguments:
+  bar                   one of the bars to be frobbled
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --foo                 foo the bars before frobbling
+
+S;
+        $this->assertEquals($expected, (string) $parser);
+    }
+
+    public function testHelpString2(): void {
+        $parser   = new ArgumentParser('frobble');
+        $parser->addArgument('bar', nargs: AP::NARGS_OPT, type: AP::TYPE_INT, default: 42, help: 'the bar (default: %(default)s)');
+        $expected = <<<S
+usage: frobble [-h] [bar]
+
+positional arguments:
+  bar                   the bar (default: 42)
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+S;
+        $this->assertEquals($expected, (string) $parser);
+    }
+
+    public function testHelpString3(): void {
+        $parser   = new ArgumentParser('frobble');
+        $parser->addArgument('--foo', help: AP::HELP_SUPPRESS);
+        $expected = <<<S
+usage: frobble [-h]
+
+optional arguments:
+  -h, --help            show this help message and exit
+
+S;
+        $this->assertEquals($expected, (string) $parser);
+    }
+
+    public function testHelpString4(): void {
+        $parser   = new ArgumentParser('frobble');
+        $parser->addArgument('--foo');
+        $parser->addArgument('bar');
+        $expected = <<<S
+usage: frobble [-h] [--foo FOO] bar
+
+positional arguments:
+  bar
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --foo FOO
+
+S;
+        $this->assertEquals($expected, (string) $parser);
+    }
+
+    public function testHelpString5(): void {
+        $parser   = new ArgumentParser('PROG');
+        $parser->addArgument('--foo', metavar: 'YYY');
+        $parser->addArgument('bar', metavar: 'XXX');
+        $expected = <<<S
+usage: PROG [-h] [--foo YYY] XXX
+
+positional arguments:
+  XXX
+
+optional arguments:
+  -h, --help            show this help message and exit
+  --foo YYY
+
+S;
+        $this->assertEquals($expected, (string) $parser);
     }
 
     public function testStrangeNames(): void {

@@ -54,6 +54,7 @@ class ArgumentParser {
     const NARGS_STAR          = '*';
     const NARGS_REQ           = '+';
     const DEFAULT_SUPPRESS    = PHP_FLOAT_MIN;
+    const HELP_SUPPRESS       = '__SUPPRESS HELP__';
 
     static private $nonrequiredNargs = [self::NARGS_OPT, self::NARGS_STAR];
     private string $prog;
@@ -91,13 +92,13 @@ class ArgumentParser {
 
         $help .= count($this->posArgs) > 0 ? "\npositional arguments:\n" : "";
         foreach ($this->posArgs as $i) {
-            $help .= "$i\n";
+            $help .= $i;
         }
         $help      .= count($this->args) > 0 ? "\noptional arguments:\n" : "";
         $processed = new SplObjectStorage();
         foreach ($this->args as $i) {
             if (!$processed->contains($i)) {
-                $help .= "$i\n";
+                $help .= $i;
                 $processed->attach($i);
             }
         }

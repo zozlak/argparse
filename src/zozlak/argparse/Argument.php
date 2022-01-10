@@ -85,7 +85,7 @@ class Argument {
             $this->nargsMin = 1;
         }
 
-        $metavarDefault = mb_strtoupper($this->dest);
+        $metavarDefault = $positional ? $this->dest : mb_strtoupper($this->dest);
         $this->dest     = str_replace('-', '_', $this->dest);
         if (count($this->choices) > 0) {
             $metavarDefault = "{" . implode(',', $this->choices) . "}";
@@ -118,12 +118,20 @@ class Argument {
     }
 
     public function toString(bool $short = false): string {
+        if ($this->help === ArgumentParser::HELP_SUPPRESS) {
+            return '';
+        }
         $help = '';
 
         if ($short) {
-            $help .= ($this->required ? " " : " [") . preg_replace('/,.*$/', '', $this->names) . " ";
+            $help .= ($this->required ? " " : " [");
+            if ($this->positional) {
+                $help .= $this->metavarToString();
+            } else {
+                $help .= preg_replace('/,.*$/', '', $this->names) . " ";
+            }
         } else {
-            $help .= "  $this->names ";
+            $help .= "  " . ($this->positional ? $this->metavar : $this->names) . " ";
         }
 
         if (!$this->positional && !in_array($this->action, self::$flagActions) && $this->action !== ArgumentParser::ACTION_HELP) {
@@ -135,10 +143,10 @@ class Argument {
         } else {
             $len  = mb_strlen($help);
             $help .= $len <= 24 ? str_repeat(" ", 24 - $len) : "\n                        ";
-            $help .= $this->help;
+            $help .= $this->formatHelp();
         }
 
-        return $help;
+        return rtrim($help) . ($short ? "" : "\n");
     }
 
     private function metavarToString(): string {
@@ -149,6 +157,17 @@ class Argument {
             ArgumentParser::NARGS_STAR => "[$this->metavar [$this->metavar ...]]",
             default => str_repeat($this->metavar, $this->nargs),
         };
+    }
+
+    private function formatHelp(): string {
+        $from = ['%(type)s', '%(default)s', '%(choices)s', '%(const)s'];
+        $to   = [
+            is_string($this->type) ? $this->type : '{callable}',
+            (string) $this->default,
+            "{" . implode(',', $this->choices) . "}",
+            (string) $this->const,
+        ];
+        return str_replace($from, $to, $this->help);
     }
 
     public function addValues(array $argv, int $pos, ?string $argName = null): int {
