@@ -56,16 +56,30 @@ class ArgumentParser {
     const DEFAULT_SUPPRESS    = PHP_FLOAT_MIN;
     const HELP_SUPPRESS       = '__SUPPRESS HELP__';
 
-    static private $nonrequiredNargs = [self::NARGS_OPT, self::NARGS_STAR];
+    /**
+     * 
+     * @var array<string>
+     */
+    static private array $nonrequiredNargs = [self::NARGS_OPT, self::NARGS_STAR];
     private string $prog;
+
+    /**
+     * 
+     * @var array<Argument>
+     */
     private array $args                    = [];
+
+    /**
+     * 
+     * @var array<Argument>
+     */
     private array $posArgs                 = [];
 
     public function __construct(?string $prog = null,
                                 private string $description = '',
                                 private string $epilog = '',
                                 private bool $exitOnError = true) {
-        $this->prog   = $prog ?? $argv[0] ?? 'SCRIPT';
+        $this->prog   = $prog ?? $_SERVER['argv'][0] ?? 'SCRIPT';
         $this->epilog = !empty($epilog) ? "\n$epilog\n" : '';
         $this->addArgument(['-h', '--help'], action: self::ACTION_HELP, help: "show this help message and exit");
     }
@@ -105,16 +119,32 @@ class ArgumentParser {
         return $help;
     }
 
-    public function printHelp() {
+    public function printHelp(): void {
         echo (string) $this;
     }
 
+    /**
+     * 
+     * @param array<string>|string $name
+     * @param string $action
+     * @param string|int $nargs
+     * @param mixed $const
+     * @param mixed $default
+     * @param null|string|callable $type
+     * @param array<mixed> $choices
+     * @param bool $required
+     * @param string $help
+     * @param string $metavar
+     * @param string $dest
+     * @return void
+     * @throws ArgparseException
+     */
     public function addArgument(array | string $name,
                                 string $action = self::ACTION_STORE,
                                 string | int $nargs = self::NARGS_SINGLE,
                                 mixed $const = null, mixed $default = null,
                                 null | string | callable $type = null,
-                                array $choices = [], ?bool $required = false,
+                                array $choices = [], bool $required = false,
                                 string $help = '', string $metavar = '',
                                 string $dest = ''): void {
         $names = is_array($name) ? array_values($name) : [$name];
@@ -162,6 +192,13 @@ class ArgumentParser {
         }
     }
 
+    /**
+     * 
+     * @param array<string>|null $args
+     * @param object|null $namespace
+     * @return object
+     * @throws \zozlak\argparse\ArgparseException
+     */
     public function parseArgs(?array $args = null, ?object $namespace = null): object {
         $args      ??= array_slice($_SERVER['argv'] ?? [], 1);
         $namespace ??= new \stdClass();
@@ -209,6 +246,12 @@ class ArgumentParser {
         }
     }
 
+    /**
+     * 
+     * @param array<string> $args
+     * @return void
+     * @throws ArgparseException
+     */
     private function setArgumentValues(array $args): void {
         $pos = 0;
         for ($i = 0; $i < count($args); $i++) {
@@ -218,14 +261,14 @@ class ArgumentParser {
                     if (!isset($this->args[$arg])) {
                         throw new ArgparseException("Unknown argument $arg");
                     }
-                    $i = $this->args[$arg]->addValues($args, $i, $arg, $arg);
+                    $i = $this->args[$arg]->addValues($args, $i, $arg);
                 } else {
                     for ($j = 1; $j < mb_strlen($arg); $j++) {
                         $flag = "-" . mb_substr($arg, $j, 1);
                         if (!isset($this->args[$flag])) {
                             throw new ArgparseException("Unknown argument $flag");
                         }
-                        $i = $this->args[$flag]->addValues($args, $i, $flag, $arg);
+                        $i = $this->args[$flag]->addValues($args, $i, $flag);
                     }
                 }
             } else {

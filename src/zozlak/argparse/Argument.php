@@ -40,17 +40,31 @@ class Argument {
         return preg_match('/^([-][^0-9]|[-][-])/', $arg) ? self::ARGTYPE_OPTIONAL : self::ARGTYPE_POSITIONAL;
     }
 
-    static private $flagActions   = [
+    /**
+     * 
+     * @var array<string>
+     */
+    static private array $flagActions   = [
         ArgumentParser::ACTION_STORE_FALSE,
         ArgumentParser::ACTION_STORE_TRUE,
         ArgumentParser::ACTION_STORE_CONST,
         ArgumentParser::ACTION_APPEND_CONST,
         ArgumentParser::ACTION_COUNT,
     ];
-    static private $simplifyNargs = [
+
+    /**
+     * 
+     * @var array<string>
+     */
+    static private array $simplifyNargs = [
         ArgumentParser::NARGS_SINGLE,
         ArgumentParser::NARGS_OPT,
     ];
+
+    /**
+     * 
+     * @var array<mixed>
+     */
     private array $values               = [];
     private int $nargsMin;
     private int $nargsMax;
@@ -58,29 +72,45 @@ class Argument {
     private bool $suppress;
     private int $mentioned            = 0;
 
+    /**
+     * 
+     * @param string $action
+     * @param string|int $nargs
+     * @param mixed $const
+     * @param mixed $default
+     * @param mixed $type
+     * @param array<mixed> $choices
+     * @param bool $required
+     * @param string $help
+     * @param string $metavar
+     * @param string $dest
+     * @param string $names
+     * @param bool $positional
+     * @throws ArgparseException
+     */
     public function __construct(private string $action,
                                 private string | int $nargs,
-                                private mixed $const, private $default,
+                                private mixed $const, private mixed $default,
                                 private mixed $type, private array $choices,
                                 private bool $required, private string $help,
                                 private string $metavar, private string $dest,
                                 private string $names, private bool $positional) {
-        $this->nargsMin = match ($nargs) {
-            ArgumentParser::NARGS_NONE => 0,
-            ArgumentParser::NARGS_SINGLE => (int) $required,
-            ArgumentParser::NARGS_OPT => 0,
-            ArgumentParser::NARGS_STAR => 0,
-            ArgumentParser::NARGS_REQ => 1,
-            default => $nargs,
-        };
-        $this->nargsMax = match ($nargs) {
-            ArgumentParser::NARGS_NONE => 0,
-            ArgumentParser::NARGS_SINGLE => 1,
-            ArgumentParser::NARGS_OPT => 1,
-            ArgumentParser::NARGS_STAR => PHP_INT_MAX,
-            ArgumentParser::NARGS_REQ => PHP_INT_MAX,
-            default => $nargs,
-        };
+        $this->nargsMin = (int) match ($nargs) {
+                ArgumentParser::NARGS_NONE => 0,
+                ArgumentParser::NARGS_SINGLE => (int) $required,
+                ArgumentParser::NARGS_OPT => 0,
+                ArgumentParser::NARGS_STAR => 0,
+                ArgumentParser::NARGS_REQ => 1,
+                default => $nargs,
+            };
+        $this->nargsMax = (int) match ($nargs) {
+                ArgumentParser::NARGS_NONE => 0,
+                ArgumentParser::NARGS_SINGLE => 1,
+                ArgumentParser::NARGS_OPT => 1,
+                ArgumentParser::NARGS_STAR => PHP_INT_MAX,
+                ArgumentParser::NARGS_REQ => PHP_INT_MAX,
+                default => $nargs,
+            };
         if ($required) {
             $this->nargsMin = 1;
         }
@@ -103,6 +133,7 @@ class Argument {
                 ArgumentParser::TYPE_FLOAT => fn($x) => doubleval($x),
                 ArgumentParser::TYPE_BOOL => fn($x) => boolval($x),
                 ArgumentParser::TYPE_STRING => fn($x) => strval($x),
+                default => throw new ArgparseException("Unknown type $this->type"),
             };
         }
         if ($this->type !== null && is_string($this->default)) {
@@ -155,7 +186,7 @@ class Argument {
             ArgumentParser::NARGS_SINGLE => $this->metavar,
             ArgumentParser::NARGS_REQ => "$this->metavar [$this->metavar ...]",
             ArgumentParser::NARGS_STAR => "[$this->metavar [$this->metavar ...]]",
-            default => str_repeat($this->metavar, $this->nargs),
+            default => str_repeat($this->metavar, (int) $this->nargs),
         };
     }
 
@@ -170,6 +201,15 @@ class Argument {
         return str_replace($from, $to, $this->help);
     }
 
+    /**
+     * 
+     * @param array<mixed> $argv
+     * @param int $pos
+     * @param string|null $argName
+     * @return int
+     * @throws HelpException
+     * @throws ArgparseException
+     */
     public function addValues(array $argv, int $pos, ?string $argName = null): int {
         if ($this->action === ArgumentParser::ACTION_HELP) {
             throw new HelpException();
@@ -246,6 +286,13 @@ class Argument {
         $this->mentioned = 0;
     }
 
+    /**
+     * 
+     * @param array<mixed> $values
+     * @param string $argName
+     * @return array<mixed>
+     * @throws ArgparseException
+     */
     private function castType(array $values, string $argName): array {
         if ($this->type === null && count($this->choices) === 0) {
             return $values;
