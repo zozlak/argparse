@@ -162,7 +162,7 @@ class ArgumentParser {
     }
 
     public function parseArgs(?array $args = null, ?object $namespace = null): object {
-        $args      ??= array_slice($argv ?? [], 1);
+        $args      ??= array_slice($_SERVER['argv'] ?? [], 1);
         $namespace ??= new \stdClass();
 
         foreach ($this->args as $i) {

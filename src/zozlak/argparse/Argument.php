@@ -152,6 +152,10 @@ class Argument {
     }
 
     public function addValues(array $argv, int $pos, ?string $argName = null): int {
+        if ($this->action === ArgumentParser::ACTION_HELP) {
+            throw new HelpException();
+        }
+
         $argName ??= $this->dest;
         $argType = self::getType((string) $argName);
         $this->mentioned++;
@@ -179,7 +183,7 @@ class Argument {
     public function setValue(object $data, ?string $argName = null): void {
         $argName ??= $this->dest;
         if (count($this->values) === 0) {
-            if ($this->required || $this->nargsMin > 0) {
+            if ($this->required) {
                 throw new ArgparseException("Argument $argName: value required");
             }
             if ($this->suppress) {
@@ -214,8 +218,7 @@ class Argument {
                 $data->$dest = array_merge($data->$dest ?? [], count($this->values) > 0 ? array_merge(...$this->values) : $this->default);
                 break;
             case ArgumentParser::ACTION_HELP:
-                count($this->values) > 0 ? throw new HelpException() : throw new SuppressException();
-                break;
+                throw new SuppressException();
         }
     }
 
