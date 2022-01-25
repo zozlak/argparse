@@ -194,7 +194,7 @@ class Argument {
         $from = ['%(type)s', '%(default)s', '%(choices)s', '%(const)s'];
         $to   = [
             is_string($this->type) ? $this->type : '{callable}',
-            (string) $this->default,
+            is_array($this->default) ? implode(', ', $this->default) : (string) $this->default,
             "{" . implode(',', $this->choices) . "}",
             (string) $this->const,
         ];
