@@ -196,10 +196,10 @@ class ArgumentParser {
      * 
      * @param array<string>|null $args
      * @param object|null $namespace
-     * @return object
+     * @return \stdClass
      * @throws \zozlak\argparse\ArgparseException
      */
-    public function parseArgs(?array $args = null, ?object $namespace = null): object {
+    public function parseArgs(?array $args = null, ?object $namespace = null): \stdClass {
         $args      ??= array_slice($_SERVER['argv'] ?? [], 1);
         $namespace ??= new \stdClass();
 
